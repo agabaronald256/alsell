@@ -1557,7 +1557,6 @@ function ListingDetail({
           )}
         </div>
       </div>
-    </div>
       {showBoost && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, overflowY: "auto" }}>
           <BoostModal listing={listing} darkMode={darkMode} onClose={() => setShowBoost(false)}
