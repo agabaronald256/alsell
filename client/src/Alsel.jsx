@@ -3609,29 +3609,34 @@ function SellModal({ darkMode, onClose, onPost }) {
                   onChange={async (e) => {
                     const files = Array.from(e.target.files);
                     if (!files.length) return;
-                    const fd = new FormData();
-                    files.forEach((f) => fd.append("images", f));
-                    try {
-                      const res = await fetch(`${API}/images`, {
-                        method: "POST",
-                        headers: {
-                          Authorization: `Bearer ${localStorage.getItem("alsel_token")}`,
-                        },
-                        body: fd,
-                      });
-                      const data = await res.json();
-                      if (data.urls)
-                        setForm((f) => ({
-                          ...f,
-                          photos: [...(f.photos || []), ...data.urls].slice(
-                            0,
-                            10,
-                          ),
-                        }));
-                    } catch (err) {
-                      console.error("Upload error:", err);
+
+                    // Check we don't exceed 10 photos
+                    const remaining = 10 - (form.photos?.length || 0);
+                    if (remaining <= 0) { alert("Maximum 10 photos reached"); e.target.value = ''; return; }
+                    const toUpload = files.slice(0, remaining);
+
+                    // Upload each file individually to avoid timeout
+                    const uploaded = [];
+                    for (const file of toUpload) {
+                      const fd = new FormData();
+                      fd.append('images', file);
+                      try {
+                        const res = await fetch(`${API}/images`, {
+                          method: 'POST',
+                          headers: { Authorization: `Bearer ${localStorage.getItem('alsel_token')}` },
+                          body: fd,
+                        });
+                        const data = await res.json();
+                        if (data.urls) uploaded.push(...data.urls);
+                      } catch (err) {
+                        console.error('Upload error:', err);
+                      }
                     }
-                    e.target.value = "";
+
+                    if (uploaded.length > 0) {
+                      setForm(f => ({ ...f, photos: [...(f.photos || []), ...uploaded].slice(0, 10) }));
+                    }
+                    e.target.value = '';
                   }}
                 />
               </div>
