@@ -4663,7 +4663,7 @@ export default function Alsel() {
             fontFamily: "DM Sans,sans-serif",
           }}
         >
-          © 2025 Alsel · Uganda's marketplace · Phase 3
+          © 2026 Alsel · Uganda's marketplace ·
         </div>
       </div>
     </div>
