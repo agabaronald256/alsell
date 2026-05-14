@@ -95,6 +95,12 @@ const endExpiredAuctions = require('./jobs/endAuctions');
 const checkPriceDrops = require('./jobs/checkPriceDrops');
 app.use('/api/bundles', require('./routes/bundles'));
 app.use('/api/boosts', require('./routes/boosts'));
+app.use('/api/admin/analytics', require('./routes/admin-analytics'));
+app.use('/api/admin/users', require('./routes/admin-users'));
+app.use('/api/admin/listings', require('./routes/admin-listings'));
+app.use('/api/admin/reports', require('./routes/admin-reports'));
+app.use('/api/seller', require('./routes/seller-dashboard'));
+app.use('/api/buyer', require('./routes/buyer-dashboard'));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Alsel API running — Phase 4' });
