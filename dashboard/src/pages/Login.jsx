@@ -22,7 +22,12 @@ export default function Login() {
       }
       login(data.user, data.token);
       toast.success(`Welcome back, ${data.user.username}`);
-      navigate('/overview');
+      const role = data.user.role;
+      if (role === 'superadmin' || role === 'moderator' || role === 'staff') {
+        navigate('/overview');
+      } else {
+        navigate('/seller');
+      }
     } catch (err) {
       toast.error(err.error || 'Invalid credentials');
     } finally {

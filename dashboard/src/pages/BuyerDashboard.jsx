@@ -16,18 +16,33 @@ export default function BuyerDashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [ov, of, bd, fv] = await Promise.all([
+        const results = await Promise.allSettled([
           api.get('/buyer/overview'),
           api.get('/buyer/offers'),
           api.get('/buyer/bids'),
           api.get('/buyer/favourites'),
         ]);
-        setOverview(ov);
-        setOffers(of);
-        setBids(bd);
-        setFavourites(fv);
-      } catch { toast.error('Failed to load dashboard'); }
-      finally { setLoading(false); }
+
+        const [ov, of, bd, fv] = results;
+
+        if (ov.status === 'fulfilled') setOverview(ov.value);
+        else console.error('Overview failed:', ov.reason);
+
+        if (of.status === 'fulfilled') setOffers(of.value);
+        else console.error('Offers failed:', of.reason);
+
+        if (bd.status === 'fulfilled') setBids(bd.value);
+        else console.error('Bids failed:', bd.reason);
+
+        if (fv.status === 'fulfilled') setFavourites(fv.value);
+        else console.error('Favourites failed:', fv.reason);
+
+      } catch (err) {
+        toast.error('Failed to load dashboard');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);

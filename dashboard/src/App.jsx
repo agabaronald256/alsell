@@ -12,11 +12,13 @@ import BuyerDashboard from './pages/BuyerDashboard';
 import AdminLog from './pages/AdminLog';
 
 function ProtectedRoute({ children, requireAdmin = false }) {
-  const { user, isModerator, isSuperAdmin } = useAuthStore();
+  const { user } = useAuthStore();
   if (!user) return <Navigate to="/login" replace />;
-  if (requireAdmin && !isSuperAdmin()) return <Navigate to="/seller" replace />;
-  if (!isModerator() && !['seller', 'buyer'].includes(window.location.pathname.split('/')[1])) {
-    return <Navigate to="/seller" replace />;
+  if (requireAdmin) {
+    const adminRoles = ['superadmin', 'moderator', 'staff'];
+    if (!adminRoles.includes(user.role)) {
+      return <Navigate to="/seller" replace />;
+    }
   }
   return children;
 }

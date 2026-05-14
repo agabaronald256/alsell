@@ -18,23 +18,44 @@ export default function SellerDashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [ov, ls, of, rv, ac] = await Promise.all([
+        const results = await Promise.allSettled([
           api.get('/seller/overview'),
           api.get('/seller/listings'),
           api.get('/seller/offers'),
           api.get('/seller/reviews'),
           api.get('/seller/activity'),
         ]);
-        setOverview(ov);
-        setListings(ls.listings || []);
-        setOffers(of);
-        setReviews(rv);
-        setActivity({
-          listings: ac.listings.map(d => ({ ...d, date: format(parseISO(d.date), 'MMM d') })),
-          offers: ac.offers.map(d => ({ ...d, date: format(parseISO(d.date), 'MMM d') })),
-        });
+
+        const [ov, ls, of, rv, ac] = results;
+
+        if (ov.status === 'fulfilled') setOverview(ov.value);
+        else console.error('Overview failed:', ov.reason);
+
+        if (ls.status === 'fulfilled') setListings(ls.value.listings || []);
+        else console.error('Listings failed:', ls.reason);
+
+        if (of.status === 'fulfilled') setOffers(of.value);
+        else console.error('Offers failed:', of.reason);
+
+        if (rv.status === 'fulfilled') setReviews(rv.value);
+        else console.error('Reviews failed:', rv.reason);
+
+        if (ac.status === 'fulfilled') {
+          setActivity({
+            listings: (ac.value.listings || []).map(d => ({
+              ...d,
+              date: format(parseISO(d.date), 'MMM d'),
+            })),
+            offers: (ac.value.offers || []).map(d => ({
+              ...d,
+              date: format(parseISO(d.date), 'MMM d'),
+            })),
+          });
+        } else console.error('Activity failed:', ac.reason);
+
       } catch (err) {
         toast.error('Failed to load dashboard');
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -59,6 +80,14 @@ export default function SellerDashboard() {
   };
 
   if (loading) return <div style={{ padding: 32, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading your dashboard...</div>;
+  if (!loading && !overview) return (
+    <div style={{ padding: 32 }}>
+      <div style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Seller Dashboard</div>
+      <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+        No seller data yet. Post your first listing on the marketplace to get started.
+      </div>
+    </div>
+  );
 
   const filteredListings = listingFilter ? listings.filter(l => l.status === listingFilter) : listings;
 
