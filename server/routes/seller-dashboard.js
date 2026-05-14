@@ -5,42 +5,43 @@ const auth = require('../middleware/auth');
 // Seller overview stats
 router.get('/overview', auth, async (req, res) => {
   try {
-    const [listings, offers, reviews, boosts] = await Promise.all([
-      db.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status='active') as active,
-          COUNT(*) FILTER (WHERE status='sold') as sold,
-          COUNT(*) FILTER (WHERE status='paused') as paused,
-          SUM(price) FILTER (WHERE status='sold') as total_value_sold,
-          AVG(price) as avg_price,
-          SUM(CASE WHEN created_at > NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END) as last_30_days
-        FROM listings WHERE user_id=$1
-      `, [req.user.id]),
-      db.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status='pending') as pending,
-          COUNT(*) FILTER (WHERE status='accepted') as accepted,
-          COUNT(*) FILTER (WHERE status='declined') as declined
-        FROM offers o
-        LEFT JOIN listings l ON o.listing_id=l.id
-        WHERE l.user_id=$1
-      `, [req.user.id]),
-      db.query(`
-        SELECT
-          COUNT(*) as total,
-          AVG(rating) as avg_rating,
-          COUNT(*) FILTER (WHERE rating=5) as five_star,
-          COUNT(*) FILTER (WHERE rating=4) as four_star,
-          COUNT(*) FILTER (WHERE rating<=3) as three_or_below
-        FROM reviews WHERE seller_id=$1
-      `, [req.user.id]),
-      db.query(`
-        SELECT COUNT(*) as active_boosts
-        FROM boosts WHERE user_id=$1 AND active=true AND expires_at > NOW()
-      `, [req.user.id]),
-    ]);
+    const listings = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status='active') as active,
+        COUNT(*) FILTER (WHERE status='sold') as sold,
+        COUNT(*) FILTER (WHERE status='paused') as paused,
+        COALESCE(AVG(price), 0) as avg_price,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as last_30_days
+      FROM listings WHERE user_id=$1
+    `, [req.user.id]);
+
+    const offers = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE o.status='pending') as pending,
+        COUNT(*) FILTER (WHERE o.status='accepted') as accepted,
+        COUNT(*) FILTER (WHERE o.status='declined') as declined
+      FROM offers o
+      LEFT JOIN listings l ON o.listing_id=l.id
+      WHERE l.user_id=$1
+    `, [req.user.id]);
+
+    const reviews = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        COALESCE(AVG(rating), 0) as avg_rating,
+        COUNT(*) FILTER (WHERE rating=5) as five_star,
+        COUNT(*) FILTER (WHERE rating=4) as four_star,
+        COUNT(*) FILTER (WHERE rating<=3) as three_or_below
+      FROM reviews WHERE seller_id=$1
+    `, [req.user.id]);
+
+    const boosts = await db.query(`
+      SELECT COUNT(*) as active_boosts
+      FROM boosts
+      WHERE user_id=$1 AND active=true AND expires_at > NOW()
+    `, [req.user.id]);
 
     res.json({
       listings: listings.rows[0],
@@ -49,6 +50,7 @@ router.get('/overview', auth, async (req, res) => {
       boosts: boosts.rows[0],
     });
   } catch (err) {
+    console.error('Seller overview error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

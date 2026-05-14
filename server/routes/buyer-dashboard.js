@@ -5,24 +5,34 @@ const auth = require('../middleware/auth');
 // Buyer overview
 router.get('/overview', auth, async (req, res) => {
   try {
-    const [offers, favourites, bids, reviews] = await Promise.all([
-      db.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status='pending') as pending,
-          COUNT(*) FILTER (WHERE status='accepted') as accepted,
-          COUNT(*) FILTER (WHERE status='declined') as declined
-        FROM offers WHERE buyer_id=$1
-      `, [req.user.id]),
-      db.query('SELECT COUNT(*) as total FROM favourites WHERE user_id=$1', [req.user.id]),
-      db.query(`
-        SELECT COUNT(*) as total,
-          COUNT(*) FILTER (WHERE a.status='active') as active_auctions
-        FROM bids b LEFT JOIN auctions a ON b.auction_id=a.id
-        WHERE b.bidder_id=$1
-      `, [req.user.id]),
-      db.query('SELECT COUNT(*) as total FROM reviews WHERE reviewer_id=$1', [req.user.id]),
-    ]);
+    const offers = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status='pending') as pending,
+        COUNT(*) FILTER (WHERE status='accepted') as accepted,
+        COUNT(*) FILTER (WHERE status='declined') as declined
+      FROM offers WHERE buyer_id=$1
+    `, [req.user.id]);
+
+    const favourites = await db.query(
+      'SELECT COUNT(*) as total FROM favourites WHERE user_id=$1',
+      [req.user.id]
+    );
+
+    const bids = await db.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(DISTINCT a.id) FILTER (WHERE a.status='active') as active_auctions
+      FROM bids b
+      LEFT JOIN auctions a ON b.auction_id=a.id
+      WHERE b.bidder_id=$1
+    `, [req.user.id]);
+
+    const reviews = await db.query(
+      'SELECT COUNT(*) as total FROM reviews WHERE reviewer_id=$1',
+      [req.user.id]
+    );
+
     res.json({
       offers: offers.rows[0],
       favourites: favourites.rows[0],
@@ -30,6 +40,7 @@ router.get('/overview', auth, async (req, res) => {
       reviews: reviews.rows[0],
     });
   } catch (err) {
+    console.error('Buyer overview error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
