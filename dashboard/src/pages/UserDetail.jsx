@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Ban, CheckCircle, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '../lib/api';
+import PromptModal from '../components/PromptModal';
 import toast from 'react-hot-toast';
 
 export default function UserDetail() {
@@ -11,6 +12,8 @@ export default function UserDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('listings');
+  const [banOpen, setBanOpen] = useState(false);
+  const [roleOpen, setRoleOpen] = useState(false);
 
   useEffect(() => {
     api.get(`/admin/users/${id}`)
@@ -18,12 +21,11 @@ export default function UserDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleBan = async () => {
-    const reason = prompt('Ban reason:');
-    if (!reason) return;
+  const handleBan = async (values) => {
     try {
-      await api.patch(`/admin/users/${id}/ban`, { reason });
+      await api.patch(`/admin/users/${id}/ban`, { reason: values.reason });
       toast.success('User banned');
+      setBanOpen(false);
       navigate('/users');
     } catch (err) { toast.error(err.error || 'Failed'); }
   };
@@ -36,13 +38,12 @@ export default function UserDetail() {
     } catch (err) { toast.error(err.error || 'Failed'); }
   };
 
-  const handleRoleChange = async () => {
-    const role = prompt('New role (user/moderator/superadmin):');
-    if (!role) return;
+  const handleRoleChange = async (values) => {
     try {
-      await api.patch(`/admin/users/${id}/role`, { role });
+      await api.patch(`/admin/users/${id}/role`, { role: values.role });
       toast.success('Role updated');
-      setData(d => ({ ...d, user: { ...d.user, role } }));
+      setRoleOpen(false);
+      setData(d => ({ ...d, user: { ...d.user, role: values.role } }));
     } catch (err) { toast.error(err.error || 'Failed'); }
   };
 
@@ -80,11 +81,11 @@ export default function UserDetail() {
                 <CheckCircle size={12} /> Verify
               </button>
             )}
-            <button onClick={handleRoleChange} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--blue-dim)', border: '1px solid rgba(75,159,255,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--blue)', cursor: 'pointer' }}>
+            <button onClick={() => setRoleOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--blue-dim)', border: '1px solid rgba(75,159,255,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--blue)', cursor: 'pointer' }}>
               <Shield size={12} /> Change role
             </button>
             {user.role !== 'banned' && user.role !== 'superadmin' && (
-              <button onClick={handleBan} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--red-dim)', border: '1px solid rgba(224,80,80,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--red)', cursor: 'pointer' }}>
+              <button onClick={() => setBanOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--red-dim)', border: '1px solid rgba(224,80,80,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--red)', cursor: 'pointer' }}>
                 <Ban size={12} /> Ban user
               </button>
             )}
@@ -194,6 +195,26 @@ export default function UserDetail() {
           </table>
         )}
       </div>
+      {banOpen && (
+        <PromptModal
+          title={`Ban ${data?.user?.username}`}
+          fields={[
+            { key: 'reason', label: 'Reason', type: 'text', required: true, placeholder: 'e.g. Fraudulent activity' },
+          ]}
+          onConfirm={handleBan}
+          onClose={() => setBanOpen(false)}
+        />
+      )}
+      {roleOpen && (
+        <PromptModal
+          title={`Change role — ${data?.user?.username}`}
+          fields={[
+            { key: 'role', label: 'New role', type: 'select', options: ['user', 'moderator', 'superadmin'] },
+          ]}
+          onConfirm={handleRoleChange}
+          onClose={() => setRoleOpen(false)}
+        />
+      )}
     </div>
   );
 }

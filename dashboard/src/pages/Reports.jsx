@@ -4,12 +4,14 @@ import { CheckCircle, XCircle, ArrowUp } from 'lucide-react';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
 import Pagination from '../components/Pagination';
+import PromptModal from '../components/PromptModal';
 
 export default function Reports() {
   const [data, setData] = useState({ reports: [], total: 0, pages: 1 });
   const [status, setStatus] = useState('pending');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [actionTarget, setActionTarget] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,8 +29,7 @@ export default function Reports() {
     setPage(1);
   };
 
-  const resolve = async (id, action) => {
-    const note = action === 'actioned' ? prompt('Action taken:') : '';
+  const resolve = async (id, action, note) => {
     try {
       await api.patch(`/admin/reports/${id}/resolve`, { action, note });
       toast.success(`Report ${action}`);
@@ -77,7 +78,7 @@ export default function Reports() {
             {r.details && <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8 }}>{r.details}</div>}
             {r.status === 'pending' && (
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => resolve(r.id, 'actioned')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--green-dim)', border: '1px solid rgba(61,214,140,0.2)', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: 'var(--green)', cursor: 'pointer' }}>
+                <button onClick={() => setActionTarget(r)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--green-dim)', border: '1px solid rgba(61,214,140,0.2)', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: 'var(--green)', cursor: 'pointer' }}>
                   <CheckCircle size={12} /> Action taken
                 </button>
                 <button onClick={() => resolve(r.id, 'dismissed')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -91,6 +92,20 @@ export default function Reports() {
           </div>
         ))}
       </div>
+      <Pagination page={page} pages={data.pages} onPageChange={setPage} />
+      {actionTarget && (
+        <PromptModal
+          title="Action taken"
+          fields={[
+            { key: 'note', label: 'Describe the action taken', type: 'text', required: true, placeholder: 'e.g. Listing removed, user warned' },
+          ]}
+          onConfirm={async (values) => {
+            await resolve(actionTarget.id, 'actioned', values.note);
+            setActionTarget(null);
+          }}
+          onClose={() => setActionTarget(null)}
+        />
+      )}
     </div>
   );
 }

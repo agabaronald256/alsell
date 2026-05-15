@@ -4146,6 +4146,9 @@ export default function Alsel() {
   const [activeChat, setActiveChat] = useState(null);
   const [favs, setFavs] = useState([]);
   const [listings, setListings] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -4196,9 +4199,16 @@ export default function Alsel() {
           params.append("lng", userCoords.lng);
           params.append("radius", "20");
         }
+        params.append("page", page);
         const res = await fetch(`${API}/listings?${params}`);
         const data = await res.json();
-        setListings(Array.isArray(data) ? data : []);
+        if (data.listings) {
+          setListings(data.listings);
+          setTotalCount(data.total || 0);
+          setTotalPages(data.pages || 1);
+        } else {
+          setListings(Array.isArray(data) ? data : []);
+        }
       } catch (err) {
         console.error(err);
         setListings([]);
@@ -4207,6 +4217,11 @@ export default function Alsel() {
       }
     };
     fetchListings();
+  }, [category, condition, activeSearch, sort, nearMe, userCoords, page]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
   }, [category, condition, activeSearch, sort, nearMe, userCoords]);
 
   // Fetch unread notifications
@@ -4559,7 +4574,7 @@ export default function Alsel() {
         condition={condition}
         setCondition={setCondition}
         darkMode={darkMode}
-        count={listings.length}
+        count={totalCount}
         nearMe={nearMe}
         onNearMe={(lat, lng) => {
           setUserCoords({ lat, lng });
@@ -4613,7 +4628,7 @@ export default function Alsel() {
             </button>
           </div>
         )}
-        {loading ? (
+        {loading && listings.length === 0 ? (
           <div style={{ textAlign: "center", padding: "80px 20px" }}>
             <div
               style={{
@@ -4626,13 +4641,23 @@ export default function Alsel() {
             </div>
           </div>
         ) : (
-          <ListingGrid
-            listings={listings}
-            darkMode={darkMode}
-            onOpen={handleOpenListing}
-            favs={favs}
-            onFave={toggleFav}
-          />
+          <>
+            <ListingGrid
+              listings={listings}
+              darkMode={darkMode}
+              onOpen={handleOpenListing}
+              favs={favs}
+              onFave={toggleFav}
+            />
+            {page < totalPages && listings.length > 0 && (
+              <div style={{ textAlign: "center", marginTop: 24, marginBottom: 8 }}>
+                <button onClick={() => setPage(p => p + 1)} disabled={loading}
+                  style={{ background: darkMode ? G.surface2 : G.cream, border: `1px solid ${darkMode ? G.borderDark : G.border}`, borderRadius: 10, padding: "11px 28px", fontSize: 13, fontWeight: 600, color: darkMode ? "#fff" : G.ink, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, fontFamily: "DM Sans,sans-serif", transition: "all 0.15s" }}>
+                  {loading ? "Loading..." : "Load more listings"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -3,12 +3,14 @@ import { Search, Trash2, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '../lib/api';
 import Pagination from '../components/Pagination';
+import PromptModal from '../components/PromptModal';
 import toast from 'react-hot-toast';
 
 export default function Listings() {
   const [data, setData] = useState({ listings: [], total: 0, pages: 1 });
   const [filters, setFilters] = useState({ search: '', category: '', status: '', sort: 'newest', page: 1 });
   const [loading, setLoading] = useState(true);
+  const [removeTarget, setRemoveTarget] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -23,12 +25,11 @@ export default function Listings() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleRemove = async (id, title) => {
-    const reason = prompt(`Remove "${title}" — reason:`);
-    if (!reason) return;
+  const handleRemove = async (values) => {
     try {
-      await api.patch(`/admin/listings/${id}/remove`, { reason });
+      await api.patch(`/admin/listings/${removeTarget.id}/remove`, { reason: values.reason });
       toast.success('Listing removed');
+      setRemoveTarget(null);
       load();
     } catch (err) { toast.error(err.error || 'Failed'); }
   };
@@ -121,7 +122,7 @@ export default function Listings() {
                           <Star size={11} /> {l.is_featured ? 'Unfeature' : 'Feature'}
                         </button>
                         {l.status !== 'removed' && (
-                          <button onClick={() => handleRemove(l.id, l.title)}
+                          <button onClick={() => setRemoveTarget({ id: l.id, title: l.title })}
                             style={{ background: 'var(--red-dim)', border: 'none', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                             <Trash2 size={11} /> Remove
                           </button>
@@ -136,6 +137,16 @@ export default function Listings() {
         </div>
         <Pagination page={filters.page} pages={data.pages} onPageChange={p => setFilters(f => ({ ...f, page: p }))} />
       </div>
+      {removeTarget && (
+        <PromptModal
+          title={`Remove "${removeTarget.title}"`}
+          fields={[
+            { key: 'reason', label: 'Reason for removal', type: 'text', required: true, placeholder: 'e.g. Violates terms of service' },
+          ]}
+          onConfirm={handleRemove}
+          onClose={() => setRemoveTarget(null)}
+        />
+      )}
     </div>
   );
 }

@@ -4,51 +4,65 @@ const auth = require('../middleware/auth');
 
 // Get all listings
 router.get('/', async (req, res) => {
-  const { category, condition, sort, q, lat, lng, radius } = req.query;
+  const { category, condition, sort, q, lat, lng, radius, page = 1, limit = 24 } = req.query;
+  const offset = (page - 1) * limit;
   try {
-    let query = `
-  SELECT l.*, u.username as seller, u.avatar_url, u.is_verified,
-         u.rating_avg as seller_rating, u.rating_count,
-         a.id as auction_id, a.current_price as auction_current_price,
-         a.starting_price as auction_starting_price, a.ends_at as auction_ends_at,
-         a.status as auction_status,
-         (SELECT COUNT(*) FROM bids b WHERE b.auction_id=a.id) as bid_count
-  FROM listings l
-  LEFT JOIN users u ON l.user_id = u.id
-  LEFT JOIN auctions a ON l.id = a.listing_id
-  WHERE l.status=$1
-`;
+    let where = ['l.status=$1'];
     let params = ['active'];
     if (category && category !== 'all') {
       params.push(category);
-      query += ` AND l.category=$${params.length}`;
+      where.push(`l.category=$${params.length}`);
     }
     if (condition && condition !== 'All') {
       params.push(condition);
-      query += ` AND l.condition=$${params.length}`;
+      where.push(`l.condition=$${params.length}`);
     }
     if (q) {
       params.push(`%${q}%`);
-      query += ` AND (l.title ILIKE $${params.length} OR l.description ILIKE $${params.length})`;
+      where.push(`(l.title ILIKE $${params.length} OR l.description ILIKE $${params.length})`);
     }
     if (lat && lng && radius) {
       params.push(parseFloat(lat));
       params.push(parseFloat(lng));
       params.push(parseFloat(radius));
-      query += ` AND (
+      where.push(`(
         6371 * acos(
           cos(radians($${params.length - 2})) * cos(radians(l.latitude)) *
           cos(radians(l.longitude) - radians($${params.length - 1})) +
           sin(radians($${params.length - 2})) * sin(radians(l.latitude))
         )
-      ) < $${params.length}`;
+      ) < $${params.length}`);
     }
+
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM listings l WHERE ${where.join(' AND ')}`, params
+    );
+
+    const whereClause = where.join(' AND ');
+    let query = `
+      SELECT l.*, u.username as seller, u.avatar_url, u.is_verified,
+             u.rating_avg as seller_rating, u.rating_count,
+             a.id as auction_id, a.current_price as auction_current_price,
+             a.starting_price as auction_starting_price, a.ends_at as auction_ends_at,
+             a.status as auction_status,
+             (SELECT COUNT(*) FROM bids b WHERE b.auction_id=a.id) as bid_count
+      FROM listings l
+      LEFT JOIN users u ON l.user_id = u.id
+      LEFT JOIN auctions a ON l.id = a.listing_id
+      WHERE ${whereClause}
+    `;
     if (sort === 'price-low') query += ' ORDER BY l.is_boosted DESC NULLS LAST, l.price ASC';
     else if (sort === 'price-high') query += ' ORDER BY l.is_boosted DESC NULLS LAST, l.price DESC';
     else query += ' ORDER BY l.is_boosted DESC NULLS LAST, l.created_at DESC';
 
-    const result = await db.query(query, params);
-    res.json(result.rows);
+    params.push(limit, offset);
+    const result = await db.query(`${query} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+    res.json({
+      listings: result.rows,
+      total: Number(countResult.rows[0].count),
+      page: Number(page),
+      pages: Math.ceil(Number(countResult.rows[0].count) / limit),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

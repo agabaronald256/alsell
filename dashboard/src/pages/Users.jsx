@@ -4,12 +4,15 @@ import { Search, Filter, Ban, CheckCircle, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '../lib/api';
 import Pagination from '../components/Pagination';
+import Modal from '../components/Modal';
+import PromptModal from '../components/PromptModal';
 import toast from 'react-hot-toast';
 
 export default function Users() {
   const [data, setData] = useState({ users: [], total: 0, pages: 1 });
   const [filters, setFilters] = useState({ search: '', role: '', verified: '', sort: 'newest', page: 1 });
   const [loading, setLoading] = useState(true);
+  const [banTarget, setBanTarget] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
@@ -28,13 +31,11 @@ export default function Users() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleBan = async (userId, username) => {
-    const reason = prompt(`Ban reason for ${username}:`);
-    if (!reason) return;
-    const days = prompt('Duration in days (leave empty for permanent):');
+  const handleBan = async (values) => {
     try {
-      await api.patch(`/admin/users/${userId}/ban`, { reason, duration_days: days ? Number(days) : null });
-      toast.success(`${username} banned`);
+      await api.patch(`/admin/users/${banTarget.userId}/ban`, { reason: values.reason, duration_days: values.duration_days ? Number(values.duration_days) : null });
+      toast.success(`${banTarget.username} banned`);
+      setBanTarget(null);
       load();
     } catch (err) { toast.error(err.error || 'Failed to ban user'); }
   };
@@ -136,7 +137,7 @@ export default function Users() {
                           </button>
                         )}
                         {u.role !== 'banned' && u.role !== 'superadmin' && (
-                          <button onClick={() => handleBan(u.id, u.username)}
+                          <button onClick={() => setBanTarget({ userId: u.id, username: u.username })}
                             style={{ background: 'var(--red-dim)', border: 'none', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                             <Ban size={11} /> Ban
                           </button>
@@ -153,6 +154,17 @@ export default function Users() {
         {/* Pagination */}
         <Pagination page={filters.page} pages={data.pages} onPageChange={p => setFilters(f => ({ ...f, page: p }))} />
       </div>
+      {banTarget && (
+        <PromptModal
+          title={`Ban ${banTarget.username}`}
+          fields={[
+            { key: 'reason', label: 'Reason', type: 'text', required: true, placeholder: 'e.g. Fraudulent activity' },
+            { key: 'duration_days', label: 'Duration (days) — leave empty for permanent', type: 'number' },
+          ]}
+          onConfirm={handleBan}
+          onClose={() => setBanTarget(null)}
+        />
+      )}
     </div>
   );
 }
