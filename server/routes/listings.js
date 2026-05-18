@@ -42,6 +42,7 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT l.*, u.username as seller, u.avatar_url, u.is_verified,
              u.rating_avg as seller_rating, u.rating_count,
+             u.trust_score as seller_trust_score,
              a.id as auction_id, a.current_price as auction_current_price,
              a.starting_price as auction_starting_price, a.ends_at as auction_ends_at,
              a.status as auction_status,
@@ -74,6 +75,7 @@ router.get('/:id', async (req, res) => {
     const result = await db.query(
   `SELECT l.*, u.username as seller, u.avatar_url, u.is_verified,
           u.rating_avg as seller_rating, u.rating_count,
+          u.trust_score as seller_trust_score,
           a.id as auction_id, a.current_price as auction_current_price,
           a.starting_price as auction_starting_price, a.ends_at as auction_ends_at,
           a.status as auction_status,
@@ -110,16 +112,37 @@ router.post('/', auth, async (req, res) => {
 
 // Update listing (protected, owner only)
 router.patch('/:id', auth, async (req, res) => {
-  const { title, description, price, condition, status } = req.body;
+  const {
+    title, description, price, condition,
+    status, location, category, photos,
+    latitude, longitude
+  } = req.body;
   try {
-    const check = await db.query('SELECT user_id FROM listings WHERE id=$1', [req.params.id]);
-    if (!check.rows.length) return res.status(404).json({ error: 'Not found' });
-    if (check.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    const check = await db.query(
+      'SELECT user_id FROM listings WHERE id=$1',
+      [req.params.id]
+    );
+    if (!check.rows.length)
+      return res.status(404).json({ error: 'Listing not found' });
+    if (check.rows[0].user_id !== req.user.id)
+      return res.status(403).json({ error: 'You can only edit your own listings' });
+
     const result = await db.query(
-      `UPDATE listings SET title=COALESCE($1,title), description=COALESCE($2,description),
-       price=COALESCE($3,price), condition=COALESCE($4,condition), status=COALESCE($5,status)
-       WHERE id=$6 RETURNING *`,
-      [title, description, price, condition, status, req.params.id]
+      `UPDATE listings SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        price = COALESCE($3, price),
+        condition = COALESCE($4, condition),
+        status = COALESCE($5, status),
+        location = COALESCE($6, location),
+        category = COALESCE($7, category),
+        photos = COALESCE($8, photos),
+        latitude = COALESCE($9, latitude),
+        longitude = COALESCE($10, longitude)
+       WHERE id=$11 RETURNING *`,
+      [title, description, price, condition, status,
+       location, category, photos, latitude, longitude,
+       req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {

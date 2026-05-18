@@ -21,6 +21,7 @@ export default function SellerDashboard() {
   const [listingPage, setListingPage] = useState(1);
   const [offerPage, setOfferPage] = useState(1);
   const [reviewPage, setReviewPage] = useState(1);
+  const [editingListing, setEditingListing] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -170,6 +171,7 @@ export default function SellerDashboard() {
                   {l.status === 'paused' && (
                     <button onClick={() => handleStatusChange(l.id, 'active')} style={{ fontSize: 10, background: 'var(--green-dim)', border: 'none', borderRadius: 5, padding: '2px 7px', color: 'var(--green)', cursor: 'pointer' }}>Activate</button>
                   )}
+                  <button onClick={() => setEditingListing(l)} style={{ fontSize: 10, background: 'var(--gold-dim)', border: 'none', borderRadius: 5, padding: '2px 7px', color: 'var(--gold)', cursor: 'pointer' }}>Edit</button>
                 </div>
               </div>
             ))}
@@ -229,6 +231,88 @@ export default function SellerDashboard() {
         )}
       </div>
       <Pagination page={reviewPage} pages={reviewPages} onPageChange={setReviewPage} />
+    </div>
+      {editingListing && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 20px', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 16, width: '100%', maxWidth: 500, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--black)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-sans)' }}>Edit listing</div>
+              <button onClick={() => setEditingListing(null)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 28, height: 28, color: '#fff', cursor: 'pointer', fontSize: 14 }}>×</button>
+            </div>
+            <DashboardEditForm
+              listing={editingListing}
+              onSave={async (form) => {
+                try {
+                  await api.patch(`/listings/${editingListing.id}`, form);
+                  setListings(prev => prev.map(l => l.id === editingListing.id ? { ...l, ...form } : l));
+                  setEditingListing(null);
+                  toast.success('Listing updated!');
+                } catch (err) {
+                  toast.error(err.error || 'Failed to update');
+                }
+              }}
+              onCancel={() => setEditingListing(null)}
+            />
+          </div>
+        </div>
+      )}
+  );
+}
+
+function DashboardEditForm({ listing, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    title: listing.title || '',
+    description: listing.description || '',
+    price: listing.price || '',
+    condition: listing.condition || 'Used',
+    location: listing.location || '',
+    status: listing.status || 'active',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const inputStyle = { width: '100%', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', fontFamily: 'var(--font-sans)' };
+  const labelStyle = { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ ...form, price: Number(form.price) });
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '65vh', overflowY: 'auto' }}>
+      <div><label style={labelStyle}>Title</label><input style={inputStyle} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+      <div><label style={labelStyle}>Description</label><textarea style={{ ...inputStyle, height: 80, resize: 'none' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+      <div><label style={labelStyle}>Price (UGX)</label><input style={inputStyle} type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+      <div>
+        <label style={labelStyle}>Condition</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {['Brand new', 'Like new', 'Used', 'For parts'].map(c => (
+            <button key={c} onClick={() => setForm(f => ({ ...f, condition: c }))}
+              style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${form.condition === c ? 'var(--gold)' : 'var(--border)'}`, background: form.condition === c ? 'var(--gold-dim)' : 'transparent', color: form.condition === c ? 'var(--gold)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div><label style={labelStyle}>Location</label><input style={inputStyle} value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
+      <div>
+        <label style={labelStyle}>Status</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['active', 'paused', 'sold'].map(s => (
+            <button key={s} onClick={() => setForm(f => ({ ...f, status: s }))}
+              style={{ flex: 1, padding: '7px', borderRadius: 8, border: `1px solid ${form.status === s ? 'var(--gold)' : 'var(--border)'}`, background: form.status === s ? 'var(--gold-dim)' : 'transparent', color: form.status === s ? 'var(--gold)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)', textTransform: 'capitalize' }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px', fontSize: 13, color: 'var(--text-muted)', cursor: 'pointer' }}>Cancel</button>
+        <button onClick={handleSave} disabled={saving} style={{ flex: 2, background: 'var(--gold)', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 700, color: 'var(--black)', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
+      </div>
     </div>
   );
 }

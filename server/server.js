@@ -8,6 +8,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
 const db = require('./db');
+const { computeTrustScore } = require('./services/trustScore');
 
 dotenv.config();
 
@@ -129,6 +130,8 @@ app.use('/api/admin/listings', require('./routes/admin-listings'));
 app.use('/api/admin/reports', require('./routes/admin-reports'));
 app.use('/api/seller', require('./routes/seller-dashboard'));
 app.use('/api/buyer', require('./routes/buyer-dashboard'));
+app.use('/api/2fa', require('./routes/twofa'));
+app.use('/api/trust', require('./routes/trust'));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Alsel API running — Phase 4' });
@@ -169,4 +172,16 @@ server.listen(PORT, () => {
   // Check price drops every hour
   setInterval(checkPriceDrops, 60 * 60 * 1000);
   checkPriceDrops();
+  // Recompute trust scores every hour
+  setInterval(async () => {
+    try {
+      const users = await db.query('SELECT id FROM users WHERE role != $1', ['banned']);
+      for (const u of users.rows) {
+        await computeTrustScore(u.id);
+      }
+      console.log(`Trust scores updated for ${users.rows.length} users`);
+    } catch (err) {
+      console.error('Trust score cron error:', err.message);
+    }
+  }, 60 * 60 * 1000);
 });
