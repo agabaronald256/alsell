@@ -367,6 +367,12 @@ function Navbar({
                   </span>
                 )}
               </button>
+              {user && (
+                <button onClick={onSecurity} title="Security Centre"
+                  style={{ background: "none", border: `1px solid ${darkMode?"rgba(255,255,255,0.1)":G.border}`, borderRadius: 8, width: 36, height: 36, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: darkMode?G.gold:G.ink2, fontSize: 14 }}>
+                  🔐
+                </button>
+              )}
             </>
           )}
           <button
@@ -1518,12 +1524,6 @@ function ListingDetail({
                     >
                       Cancel
               </button>
-              {user && (
-                <button onClick={onSecurity} title="Security Centre"
-                  style={{ background: "none", border: `1px solid ${darkMode?"rgba(255,255,255,0.1)":G.border}`, borderRadius: 8, width: 36, height: 36, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: darkMode?G.gold:G.ink2, fontSize: 14 }}>
-                  🔐
-                </button>
-              )}
               <button
                       onClick={async () => {
                         setSubmittingReview(true);
